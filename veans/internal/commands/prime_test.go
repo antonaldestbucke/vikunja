@@ -63,6 +63,7 @@ func TestPrimeTemplate_RendersAnchors(t *testing.T) {
 		"Scrapped",
 		// HTML format guidance the agent depends on:
 		"Description format",
+		"Titles are plaintext",
 		`data-type="taskList"`,
 		`data-checked="false"`,
 		"<h2>",

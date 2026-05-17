@@ -58,6 +58,11 @@ stored field as HTML. Plain markdown saves as literal text and shows up
 ugly in the UI; write HTML directly. Tokens are cheap, conversion bugs
 aren't.
 
+**Titles are plaintext — not HTML, not markdown.** They show up in
+list views, breadcrumbs, and notification subjects; tags would leak
+through as `&lt;p&gt;…&lt;/p&gt;` everywhere. Write
+`fix the bug` not `<p>fix the bug</p>` or `**fix** the bug`.
+
 Canonical TipTap shapes the web UI renders cleanly:
 
 ```html
