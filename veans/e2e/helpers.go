@@ -76,7 +76,7 @@ func New(t *testing.T) *Harness {
 			t.Fatal("set VEANS_E2E_ADMIN_TOKEN or VEANS_E2E_ADMIN_USER + VEANS_E2E_ADMIN_PASS")
 		}
 		c := client.New(apiURL, "")
-		resp, err := c.Login(context.Background(), &client.LoginRequest{
+		resp, err := c.Login(t.Context(), &client.LoginRequest{
 			Username: user, Password: pass, LongToken: true,
 		})
 		if err != nil {
@@ -93,13 +93,12 @@ func New(t *testing.T) *Harness {
 	}
 }
 
-// Workspace creates a per-test git repo in a TempDir, with HOME and
-// XDG_CONFIG_HOME pointed at TempDirs so the credential store falls back
-// to its file backend rather than touching the developer's keychain.
+// Workspace creates a per-test git repo in a TempDir with HOME pointed at
+// a TempDir so the credential store writes under the test's own directory
+// rather than touching the developer's keychain.
 type Workspace struct {
 	Dir          string
 	Home         string
-	XDGConfig    string
 	ConfigPath   string
 	BotUsername  string
 	envOverrides map[string]string
@@ -111,7 +110,6 @@ func (h *Harness) NewWorkspace(t *testing.T) *Workspace {
 	t.Helper()
 	dir := t.TempDir()
 	home := t.TempDir()
-	xdg := t.TempDir()
 
 	for _, c := range [][]string{
 		{"git", "init", "-q", "-b", "main"},
@@ -145,11 +143,9 @@ func (h *Harness) NewWorkspace(t *testing.T) *Workspace {
 	return &Workspace{
 		Dir:        dir,
 		Home:       home,
-		XDGConfig:  xdg,
 		ConfigPath: filepath.Join(dir, ".veans.yml"),
 		envOverrides: map[string]string{
-			"HOME":            home,
-			"XDG_CONFIG_HOME": xdg,
+			"HOME": home,
 		},
 	}
 }
@@ -160,7 +156,10 @@ func (h *Harness) Run(t *testing.T, ws *Workspace, args ...string) (stdout, stde
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), h.Binary, args...)
 	cmd.Dir = ws.Dir
-	cmd.Env = append(os.Environ(), envSlice(ws.envOverrides)...)
+	// Filter VEANS_* out of the inherited env before applying our
+	// overrides — a developer's VEANS_TOKEN would otherwise mask the
+	// per-test bot token via the env backend.
+	cmd.Env = append(filterEnv(os.Environ(), "VEANS_"), envSlice(ws.envOverrides)...)
 	var so, se bytes.Buffer
 	cmd.Stdout = &so
 	cmd.Stderr = &se
@@ -179,7 +178,7 @@ func (h *Harness) Run(t *testing.T, ws *Workspace, args ...string) (stdout, stde
 // it. Tests use a unique title to keep results isolated across parallel runs.
 func (h *Harness) CreateProject(t *testing.T, title, identifier string) *client.Project {
 	t.Helper()
-	out, err := h.AdminClient.CreateProject(context.Background(),
+	out, err := h.AdminClient.CreateProject(t.Context(),
 		&client.Project{Title: title, Identifier: identifier})
 	if err != nil {
 		t.Fatalf("create project %q: %v", title, err)
@@ -191,7 +190,7 @@ func (h *Harness) CreateProject(t *testing.T, title, identifier string) *client.
 // auto-creates one).
 func (h *Harness) FindKanbanView(t *testing.T, projectID int64) *client.ProjectView {
 	t.Helper()
-	views, err := h.AdminClient.ListProjectViews(context.Background(), projectID)
+	views, err := h.AdminClient.ListProjectViews(t.Context(), projectID)
 	if err != nil {
 		t.Fatalf("list views: %v", err)
 	}
@@ -207,7 +206,7 @@ func (h *Harness) FindKanbanView(t *testing.T, projectID int64) *client.ProjectV
 // GetTask fetches a task by ID for verification.
 func (h *Harness) GetTask(t *testing.T, id int64) *client.Task {
 	t.Helper()
-	task, err := h.AdminClient.GetTask(context.Background(), id)
+	task, err := h.AdminClient.GetTask(t.Context(), id)
 	if err != nil {
 		t.Fatalf("get task %d: %v", id, err)
 	}
@@ -249,6 +248,17 @@ func envSlice(overrides map[string]string) []string {
 	out := make([]string, 0, len(overrides))
 	for k, v := range overrides {
 		out = append(out, k+"="+v)
+	}
+	return out
+}
+
+// filterEnv returns env entries whose keys do NOT start with prefix.
+func filterEnv(env []string, prefix string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, prefix) {
+			out = append(out, kv)
+		}
 	}
 	return out
 }

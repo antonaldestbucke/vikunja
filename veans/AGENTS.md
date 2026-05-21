@@ -112,15 +112,23 @@ what's bitten me; if a new endpoint behaves oddly, suspect one of these:
 
 ## Credential store
 
-- Lookup chain: keychain → env (`VEANS_TOKEN`, optionally pinned by
-  `VEANS_SERVER`) → file (`~/.config/veans/credentials.yml`, mode 0600,
-  honors `XDG_CONFIG_HOME`).
+- Lookup chain: keychain → env (`VEANS_TOKEN`) → file
+  (`~/.config/veans/credentials.yml`, mode 0600, atomic-write + flock
+  serialization). `XDG_CONFIG_HOME` is deliberately not honored —
+  agent-only audience runs in a known environment, and the env var
+  was a path-traversal seam for no real benefit.
 - `Chain.Set` falls through to the next backend on error so a missing
   dbus on a CI runner doesn't block writes — the file backend is the
   reliable last-resort.
-- E2e tests override `HOME` and `XDG_CONFIG_HOME` per test to keep the
-  developer's keyring untouched. Don't bypass the credentials package
-  in tests — leaks between tests will surface as the wrong bot token.
+- File writes go through a tmp file + `Rename`, with `Chmod 0o600`
+  re-asserted on the destination inode so a pre-existing wider mode
+  is narrowed. Concurrent writers (e.g. two `veans login` runs) are
+  serialized via `flock` on `<path>.lock` (Unix only; Windows is a
+  no-op stub since the audience is Linux/macOS).
+- E2e tests override `HOME` per test and `filterEnv(..., "VEANS_")`
+  strips any inherited `VEANS_TOKEN` so the developer's keyring
+  stays untouched. Don't bypass the credentials package in tests —
+  leaks between tests will surface as the wrong bot token.
 
 ## Project identifiers and bot usernames
 
