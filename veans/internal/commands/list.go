@@ -87,8 +87,10 @@ func runList(cmd *cobra.Command, rt *runtime, f *listFlags) ([]*client.Task, err
 		return nil, err
 	}
 
-	// Apply client-side filters AND-style.
-	var out []*client.Task
+	// Apply client-side filters AND-style. Pre-allocate as an empty
+	// (non-nil) slice so an empty result still encodes as `[]`, not `null` —
+	// the agent contract is "raw array".
+	out := make([]*client.Task, 0, len(tasks))
 	for _, t := range tasks {
 		taskBucket := t.CurrentBucketID(rt.cfg.ViewID)
 		if f.ready && !isReady(t, rt.cfg.Buckets.Todo, rt.cfg.ViewID) {
