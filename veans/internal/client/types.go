@@ -106,6 +106,11 @@ type Task struct {
 	Buckets     []*Bucket  `json:"buckets,omitempty"`
 	Assignees   []*User    `json:"assignees,omitempty"`
 	Labels      []*Label   `json:"labels,omitempty"`
+	// RelatedTasks groups other tasks by relation kind ("blocking",
+	// "blocked", "parenttask", "subtask", "related", ...). Vikunja
+	// populates this on every task read; the nested tasks have their
+	// own RelatedTasks nil'd out server-side to avoid cycles.
+	RelatedTasks map[string][]*Task `json:"related_tasks,omitempty"`
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	DueDate     *time.Time `json:"due_date,omitempty"`
 	EndDate     *time.Time `json:"end_date,omitempty"`
