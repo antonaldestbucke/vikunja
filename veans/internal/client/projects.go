@@ -50,6 +50,16 @@ func (c *Client) GetProject(ctx context.Context, id int64) (*Project, error) {
 	return &out, nil
 }
 
+// CreateProject creates a new project owned by the calling user. Vikunja
+// auto-creates the default views (List, Gantt, Table, Kanban) on insert.
+func (c *Client) CreateProject(ctx context.Context, p *Project) (*Project, error) {
+	var out Project
+	if err := c.Do(ctx, "PUT", "/projects", nil, p, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ShareProjectWithUser grants `username` `permission` on project `id`.
 func (c *Client) ShareProjectWithUser(ctx context.Context, projectID int64, share *ProjectUser) (*ProjectUser, error) {
 	var out ProjectUser

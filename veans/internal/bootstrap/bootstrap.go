@@ -304,10 +304,16 @@ func pickProject(ctx context.Context, c *client.Client, id int64, p auth.Prompte
 		}
 		active = append(active, pr)
 	}
-	if len(active) == 0 {
-		return nil, output.New(output.CodeNotFound, "no projects visible to this user — create one in the Vikunja UI first")
-	}
 	sort.Slice(active, func(i, j int) bool { return active[i].Title < active[j].Title })
+
+	// The "create a new project" option sits at len(active)+1 in the menu;
+	// when the user has nothing to pick from, it's the only choice.
+	createIdx := len(active) + 1
+
+	if len(active) == 0 {
+		fmt.Fprintln(out, "No projects yet — let's create one.")
+		return createProject(ctx, c, p, out)
+	}
 
 	fmt.Fprintln(out, "Available projects:")
 	for i, pr := range active {
@@ -317,6 +323,8 @@ func pickProject(ctx context.Context, c *client.Client, id int64, p auth.Prompte
 		}
 		fmt.Fprintf(out, "  [%d] #%d %s — %s\n", i+1, pr.ID, pr.Title, ident)
 	}
+	fmt.Fprintf(out, "  [%d] Create a new project\n", createIdx)
+
 	choice, err := p.ReadLine("Pick a project [1]: ")
 	if err != nil {
 		return nil, err
@@ -325,12 +333,42 @@ func pickProject(ctx context.Context, c *client.Client, id int64, p auth.Prompte
 	idx := 1
 	if choice != "" {
 		v, err := strconv.Atoi(choice)
-		if err != nil || v < 1 || v > len(active) {
+		if err != nil || v < 1 || v > createIdx {
 			return nil, output.New(output.CodeValidation, "invalid project choice %q", choice)
 		}
 		idx = v
 	}
+	if idx == createIdx {
+		return createProject(ctx, c, p, out)
+	}
 	return active[idx-1], nil
+}
+
+// createProject prompts for the new project's title and identifier and
+// PUTs it. Title is required; identifier is optional (Vikunja caps it at
+// 10 chars). The fresh project comes with the default views — including
+// the Kanban view pickKanbanView is about to grab.
+func createProject(ctx context.Context, c *client.Client, p auth.Prompter, out io.Writer) (*client.Project, error) {
+	title, err := p.ReadLine("New project title: ")
+	if err != nil {
+		return nil, err
+	}
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, output.New(output.CodeValidation, "project title is required")
+	}
+	ident, err := p.ReadLine("Identifier (optional, ≤10 letters/digits, used for task IDs like PROJ-NN): ")
+	if err != nil {
+		return nil, err
+	}
+	ident = strings.TrimSpace(ident)
+
+	created, err := c.CreateProject(ctx, &client.Project{Title: title, Identifier: ident})
+	if err != nil {
+		return nil, output.Wrap(output.CodeUnknown, err, "create project %q: %v", title, err)
+	}
+	progress(out, "Created project #%d %q", created.ID, created.Title)
+	return created, nil
 }
 
 func pickKanbanView(ctx context.Context, c *client.Client, projectID int64, viewID int64, p auth.Prompter, out io.Writer) (*client.ProjectView, error) {

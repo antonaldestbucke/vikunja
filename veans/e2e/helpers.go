@@ -179,15 +179,12 @@ func (h *Harness) Run(t *testing.T, ws *Workspace, args ...string) (stdout, stde
 // it. Tests use a unique title to keep results isolated across parallel runs.
 func (h *Harness) CreateProject(t *testing.T, title, identifier string) *client.Project {
 	t.Helper()
-	body := map[string]any{"title": title}
-	if identifier != "" {
-		body["identifier"] = identifier
-	}
-	var out client.Project
-	if err := h.AdminClient.Do(context.Background(), "PUT", "/projects", nil, body, &out); err != nil {
+	out, err := h.AdminClient.CreateProject(context.Background(),
+		&client.Project{Title: title, Identifier: identifier})
+	if err != nil {
 		t.Fatalf("create project %q: %v", title, err)
 	}
-	return &out
+	return out
 }
 
 // FindKanbanView returns the first Kanban view of the project (Vikunja
