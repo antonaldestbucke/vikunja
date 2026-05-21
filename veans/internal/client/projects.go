@@ -23,21 +23,25 @@ import (
 	"strconv"
 )
 
-// ListProjects pages through GET /projects, accumulating until exhausted.
+// ListProjects pages through GET /projects, accumulating until the server's
+// x-pagination-total-pages header says we're done.
 func (c *Client) ListProjects(ctx context.Context) ([]*Project, error) {
 	var all []*Project
-	for page := 1; ; page++ {
+	page := 1
+	for {
 		q := url.Values{}
 		q.Set("page", strconv.Itoa(page))
 		q.Set("per_page", "50")
 		var batch []*Project
-		if err := c.Do(ctx, "GET", "/projects", q, nil, &batch); err != nil {
+		total, err := c.DoPaginated(ctx, "GET", "/projects", q, &batch)
+		if err != nil {
 			return nil, err
 		}
 		all = append(all, batch...)
-		if len(batch) < 50 {
+		if paginationDone(page, len(batch), 50, total) {
 			return all, nil
 		}
+		page++
 	}
 }
 
