@@ -122,24 +122,3 @@ func (b *FileBackend) Set(server, account, token string) error {
 	})
 	return b.save(s)
 }
-
-func (b *FileBackend) Delete(server, account string) error {
-	s, err := b.load()
-	if err != nil {
-		return err
-	}
-	out := s.Credentials[:0]
-	removed := false
-	for _, e := range s.Credentials {
-		if e.Server == server && e.Account == account {
-			removed = true
-			continue
-		}
-		out = append(out, e)
-	}
-	if !removed {
-		return ErrNotFound
-	}
-	s.Credentials = out
-	return b.save(s)
-}

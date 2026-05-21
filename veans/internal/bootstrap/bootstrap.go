@@ -84,10 +84,6 @@ type Options struct {
 	OpenCodeFlagSet   bool
 	NoHooks           bool
 
-	// Store and Prompter are dependency-injected for testing.
-	Store    credentials.Store
-	Prompter auth.Prompter
-
 	// Out is where progress is written.
 	Out io.Writer
 
@@ -95,14 +91,10 @@ type Options struct {
 	RepoRoot string
 }
 
-// Result is returned on success. The caller (cobra command) prints
-// hook snippets and the bot username for the user.
+// Result is returned on success — just the bits printPostInitSummary reads.
 type Result struct {
 	Config       *config.Config
-	Info         *client.Info
 	BotUser      *client.BotUser
-	Token        *client.APIToken
-	RepoRoot     string
 	AgentChoices AgentHookChoice
 }
 
@@ -120,14 +112,8 @@ func Init(ctx context.Context, opts *Options) (*Result, error) {
 		return nil, output.New(output.CodeValidation, "ConfigPath is required")
 	}
 
-	prompter := opts.Prompter
-	if prompter == nil {
-		prompter = auth.NewStdPrompter()
-	}
-	store := opts.Store
-	if store == nil {
-		store = credentials.Default()
-	}
+	prompter := auth.NewStdPrompter()
+	store := credentials.Default()
 
 	// 1. Repo root + suggested bot username.
 	repoRoot := opts.RepoRoot
@@ -279,10 +265,7 @@ func Init(ctx context.Context, opts *Options) (*Result, error) {
 
 	return &Result{
 		Config:       cfg,
-		Info:         info,
 		BotUser:      bot,
-		Token:        mintedToken,
-		RepoRoot:     repoRoot,
 		AgentChoices: choices,
 	}, nil
 }

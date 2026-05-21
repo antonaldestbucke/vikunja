@@ -35,4 +35,3 @@ func (*EnvBackend) Get(_, _ string) (string, error) {
 }
 
 func (*EnvBackend) Set(_, _, _ string) error { return errReadOnly }
-func (*EnvBackend) Delete(_, _ string) error { return errReadOnly }

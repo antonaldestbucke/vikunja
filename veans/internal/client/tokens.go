@@ -16,10 +16,7 @@
 
 package client
 
-import (
-	"context"
-	"fmt"
-)
+import "context"
 
 // CreateToken mints an API token. If t.OwnerID is non-zero, the token is
 // minted FOR that user — the caller must be the bot's owner (i.e. created
@@ -30,18 +27,4 @@ func (c *Client) CreateToken(ctx context.Context, t *APIToken) (*APIToken, error
 		return nil, err
 	}
 	return &out, nil
-}
-
-// ListTokens returns every API token the authenticated user can see.
-func (c *Client) ListTokens(ctx context.Context) ([]*APIToken, error) {
-	var out []*APIToken
-	if err := c.Do(ctx, "GET", "/tokens", nil, nil, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// DeleteToken revokes a token by ID. Used by `veans login` rotation.
-func (c *Client) DeleteToken(ctx context.Context, id int64) error {
-	return c.Do(ctx, "DELETE", fmt.Sprintf("/tokens/%d", id), nil, nil, nil)
 }
