@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -188,6 +189,14 @@ func newCallbackServer(listener net.Listener) (*http.Server, <-chan callbackResu
 				http.NotFound(rw, r)
 				return
 			}
+			// Pin to GET so a third-party page can't POST a forged
+			// (code, state) into the loopback handler. State binding
+			// already defends, but cheap belt-and-braces.
+			if r.Method != http.MethodGet {
+				rw.Header().Set("Allow", "GET")
+				http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 			q := r.URL.Query()
 			res := callbackResult{code: q.Get("code"), state: q.Get("state")}
 			if errCode := q.Get("error"); errCode != "" {
@@ -249,11 +258,14 @@ func renderCallbackPage(w http.ResponseWriter, err error) {
 	w.Header().Set("Cache-Control", "no-store")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		// HTML-escape the authorization-server's error_description — it
+		// arrives unsanitized from a remote source and we render it
+		// straight into the loopback page.
 		_, _ = fmt.Fprintf(w, `<!doctype html><html><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">
 <h1>veans: authorization failed</h1>
 <p>%s</p>
 <p>You can close this tab and re-run <code>veans init</code>.</p>
-</body></html>`, err.Error())
+</body></html>`, html.EscapeString(err.Error()))
 		return
 	}
 	_, _ = w.Write([]byte(`<!doctype html><html><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">

@@ -490,9 +490,10 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "{\"username\":\"$VEANS_E2E_ADMIN_USER\",\"password\":\"$VEANS_E2E_ADMIN_PASS\",\"email\":\"e2e@example.com\"}" \
             > /dev/null
-          # `mage test` runs unit + e2e packages; the e2e suite self-skips
-          # when VEANS_E2E_API_URL is unset so the same target works locally.
-          (cd veans && mage test)
+          # `mage test:e2e` builds the binary once and exports VEANS_BINARY
+          # so each subtest reuses it (plain `mage test` would rebuild per
+          # test via buildOrLocate()).
+          (cd veans && mage test:e2e)
       - name: Upload API log on failure
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
