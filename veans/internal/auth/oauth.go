@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/browser"
+
 	"code.vikunja.io/veans/internal/client"
 	"code.vikunja.io/veans/internal/output"
 )
@@ -130,7 +132,10 @@ func runOAuthFlow(ctx context.Context, c *client.Client, _ Prompter, w io.Writer
 
 	authURL := buildAuthorizeURL(c.BaseURL, redirectURI, pkce, state)
 	announceBrowserStep(w, authURL)
-	openBrowser(ctx, authURL)
+	// Best-effort browser launch — the URL is also printed so the user
+	// can paste it manually if their environment can't auto-open one
+	// (SSH session, container without DISPLAY, etc.).
+	_ = browser.OpenURL(authURL)
 
 	result, err := waitForCallback(ctx, resultCh)
 	if err != nil {
@@ -256,13 +261,6 @@ func renderCallbackPage(w http.ResponseWriter, err error) {
 <h1>veans is authorized</h1>
 <p>You can close this tab and return to the terminal.</p>
 </body></html>`))
-}
-
-// openBrowser tries to launch the user's default browser at `url`. Failure
-// is ignored — the calling flow already prints the URL to stderr so the
-// user can open it themselves.
-func openBrowser(ctx context.Context, url string) {
-	_ = osOpen(ctx, url)
 }
 
 // silence the unused-import linter when errors isn't referenced elsewhere.
