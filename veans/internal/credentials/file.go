@@ -89,7 +89,7 @@ func (b *FileBackend) load() (*fileSchema, error) {
 // save writes the schema atomically (tmpfile + rename) at mode 0600 and
 // re-asserts the mode on the destination inode in case an earlier write
 // left a wider mode behind.
-func (b *FileBackend) save(s *fileSchema) error {
+func (b *FileBackend) save(s *fileSchema) (rerr error) {
 	if err := os.MkdirAll(filepath.Dir(b.path), 0o700); err != nil {
 		return err
 	}
@@ -102,30 +102,34 @@ func (b *FileBackend) save(s *fileSchema) error {
 		return err
 	}
 	tmpPath := tmp.Name()
+	// On any error before the rename completes, drop the half-written
+	// temp file. tmpPath is the return of CreateTemp on a directory we
+	// own, so gosec's path-traversal warning doesn't apply.
+	defer func() {
+		if rerr != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath) //nolint:gosec // G703: tmpPath came from os.CreateTemp on a dir we control
+		}
+	}()
 	// CreateTemp opens at 0600 already, but be defensive: an inherited
 	// umask shouldn't matter for CreateTemp on POSIX, but explicit is
 	// cheaper than debugging later.
 	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
-		_ = os.Remove(tmpPath)
 		return err
 	}
 	if _, err := tmp.Write(buf); err != nil {
-		tmp.Close()
-		_ = os.Remove(tmpPath)
 		return err
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		_ = os.Remove(tmpPath)
 		return err
 	}
 	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
 		return err
 	}
-	if err := os.Rename(tmpPath, b.path); err != nil {
-		_ = os.Remove(tmpPath)
+	// gosec/G703: both paths come from FileBackend state (b.path is set
+	// from defaultCredsPath or an explicit constructor arg, tmpPath from
+	// CreateTemp on the same dir); neither is runtime user-influenceable.
+	if err := os.Rename(tmpPath, b.path); err != nil { //nolint:gosec
 		return err
 	}
 	// Belt-and-braces: a pre-existing destination at 0644 keeps its mode
