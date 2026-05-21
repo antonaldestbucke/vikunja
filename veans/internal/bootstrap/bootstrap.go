@@ -26,6 +26,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -192,14 +193,21 @@ func Init(ctx context.Context, opts *Options) (*Result, error) {
 		return nil, err
 	}
 
-	// 9. Share the project with the bot.
-	if _, err := human.ShareProjectWithUser(ctx, project.ID, &client.ProjectUser{
+	// 9. Share the project with the bot. 409 ("user already has access")
+	// is the expected response when reusing a bot that was set up by a
+	// previous init run — treat it as a soft-success.
+	_, shareErr := human.ShareProjectWithUser(ctx, project.ID, &client.ProjectUser{
 		Username:   bot.Username,
 		Permission: client.PermissionReadWrite,
-	}); err != nil {
-		return nil, output.Wrap(output.CodeUnknown, err, "share project with bot: %v", err)
+	})
+	switch {
+	case shareErr == nil:
+		progress(opts.Out, "Shared project with %q (read+write)", bot.Username)
+	case isConflictErr(shareErr):
+		progress(opts.Out, "Project already shared with %q", bot.Username)
+	default:
+		return nil, output.Wrap(output.CodeUnknown, shareErr, "share project with bot: %v", shareErr)
 	}
-	progress(opts.Out, "Shared project with %q (read+write)", bot.Username)
 
 	// 10. Discover available API permission scopes, mint the bot's token.
 	routes, err := human.Routes(ctx)
@@ -468,4 +476,10 @@ func progress(w io.Writer, format string, args ...any) {
 	fmt.Fprintf(w, "  → "+format+"\n", args...)
 }
 
-// silence the unused-import linter when errors isn't used elsewhere.
+// isConflictErr reports whether the wrapped HTTP error is a 409 — used by
+// init's "share project with bot" step, which legitimately gets one when
+// the bot is being reused from an earlier run.
+func isConflictErr(err error) bool {
+	var oe *output.Error
+	return errors.As(err, &oe) && oe.Code == output.CodeConflict
+}
