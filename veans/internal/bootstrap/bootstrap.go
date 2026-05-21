@@ -136,18 +136,18 @@ func Init(ctx context.Context, opts *Options) (*Result, error) {
 		}
 		opts.Server = strings.TrimSpace(v)
 	}
-	opts.Server = strings.TrimRight(opts.Server, "/")
-	if opts.Server == "" {
-		return nil, output.New(output.CodeValidation, "server URL is required")
-	}
 
-	// 3. Probe /info.
-	human := client.New(opts.Server, "")
-	info, err := human.Info(ctx)
+	// 3. Discover the actual API URL: the user might have typed bare
+	// "vikunja.example.com", or pasted the URL with /api/v1 already in
+	// it, or be on a default-port localhost install. DiscoverServer
+	// probes the plausible variants and returns the canonical base.
+	canonical, info, err := client.DiscoverServer(ctx, opts.Server)
 	if err != nil {
-		return nil, output.Wrap(output.CodeUnknown, err, "GET /info on %s: %v", opts.Server, err)
+		return nil, err
 	}
-	progress(opts.Out, "Connected to Vikunja %s", info.Version)
+	opts.Server = canonical
+	human := client.New(canonical, "")
+	progress(opts.Out, "Connected to Vikunja %s at %s", info.Version, canonical)
 
 	// 4. Acquire human JWT (transient — used until step 11). Default is the
 	// OAuth flow; --token / --use-password / --username+--password override.
