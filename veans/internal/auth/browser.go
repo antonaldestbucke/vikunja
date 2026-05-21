@@ -16,33 +16,35 @@
 
 package auth
 
-// osOpen launches the OS's default browser at the given URL. The file is
-// kept platform-neutral by delegating to "xdg-open" — the same approach
-// most Go CLIs take. macOS, Linux and BSD all ship it (or a compat alias);
-// on Windows the ./browser_windows.go shim takes precedence via build tag.
+// osOpen launches the OS's default browser at the given URL. We delegate to
+// `open` on macOS, `xdg-open` on other Unixes, and `rundll32` on Windows.
 
 import (
 	"context"
 	"os/exec"
 	"runtime"
-	"time"
 )
 
-func osOpen(ctx context.Context, url string) error {
-	// Cap the launch attempt so a misbehaving xdg-open shim can't block
-	// the OAuth flow indefinitely. The browser process itself runs
-	// independently of this child and survives the timeout.
-	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+func osOpen(_ context.Context, url string) error {
+	// Intentionally use context.Background() rather than the caller's ctx.
+	// Cancelling the launcher process tears down the browser handoff before
+	// xdg-open / open / rundll32 have had time to fork the real browser.
+	// The launcher is fire-and-forget; we reap the zombie in a goroutine so
+	// it doesn't linger on the process table.
+	bg := context.Background()
 
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(cctx, "open", url)
+		cmd = exec.CommandContext(bg, "open", url) //nolint:contextcheck // detach by design — see comment above
 	case "windows":
-		cmd = exec.CommandContext(cctx, "rundll32", "url.dll,FileProtocolHandler", url)
+		cmd = exec.CommandContext(bg, "rundll32", "url.dll,FileProtocolHandler", url) //nolint:contextcheck // detach by design
 	default:
-		cmd = exec.CommandContext(cctx, "xdg-open", url)
+		cmd = exec.CommandContext(bg, "xdg-open", url) //nolint:contextcheck // detach by design
 	}
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
