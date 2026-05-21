@@ -21,28 +21,6 @@ import (
 	"fmt"
 )
 
-// FullPermissions is the broadest set of API token scopes a veans bot needs:
-// read+write on every resource it touches. Vikunja's permission map is
-// `{resource: [actions]}` shaped; the keys here cover everything the CLI
-// calls for normal operation.
-//
-// We over-grant intentionally — the bot needs to claim, comment, label,
-// relate, and update tasks; revoking unused scopes after the fact is cheap.
-func FullPermissions() map[string][]string {
-	return map[string][]string{
-		"tasks":            {"read_one", "read_all", "create", "update", "delete"},
-		"projects":         {"read_one", "read_all", "create", "update", "delete"},
-		"labels":           {"read_one", "read_all", "create", "update", "delete"},
-		"task_comments":    {"read_one", "read_all", "create", "update", "delete"},
-		"task_assignees":   {"create", "delete", "read_all"},
-		"task_relations":   {"create", "delete"},
-		"task_attachments": {"create", "read_one", "delete"},
-		"buckets":          {"read_all", "create", "update", "delete"},
-		"project_views":    {"read_one", "read_all"},
-		"users":            {"read_all"},
-	}
-}
-
 // CreateToken mints an API token. If t.OwnerID is non-zero, the token is
 // minted FOR that user — the caller must be the bot's owner (i.e. created
 // the bot in step 8 of init).

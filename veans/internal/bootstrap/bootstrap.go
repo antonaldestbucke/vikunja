@@ -26,7 +26,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -115,10 +114,7 @@ func Init(ctx context.Context, opts *Options) (*Result, error) {
 		opts = &Options{}
 	}
 	if opts.Out == nil {
-		opts = &Options{}
-	}
-	if opts.Out == nil {
-		opts = &Options{Out: io.Discard}
+		opts.Out = io.Discard
 	}
 	if opts.ConfigPath == "" {
 		return nil, output.New(output.CodeValidation, "ConfigPath is required")
@@ -490,4 +486,3 @@ func progress(w io.Writer, format string, args ...any) {
 }
 
 // silence the unused-import linter when errors isn't used elsewhere.
-var _ = errors.New

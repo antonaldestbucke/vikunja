@@ -21,7 +21,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -264,4 +263,3 @@ func renderCallbackPage(w http.ResponseWriter, err error) {
 }
 
 // silence the unused-import linter when errors isn't referenced elsewhere.
-var _ = errors.New
