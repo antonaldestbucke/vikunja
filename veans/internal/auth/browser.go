@@ -17,34 +17,16 @@
 package auth
 
 // osOpen launches the OS's default browser at the given URL. We delegate to
-// `open` on macOS, `xdg-open` on other Unixes, and `rundll32` on Windows.
+// github.com/pkg/browser, which handles macOS / Linux / Windows / WSL and
+// properly detaches the child process — so we don't repeat the
+// kill-the-launcher-before-it-forks bug we had with a hand-rolled exec.
 
 import (
 	"context"
-	"os/exec"
-	"runtime"
+
+	"github.com/pkg/browser"
 )
 
 func osOpen(_ context.Context, url string) error {
-	// Intentionally use context.Background() rather than the caller's ctx.
-	// Cancelling the launcher process tears down the browser handoff before
-	// xdg-open / open / rundll32 have had time to fork the real browser.
-	// The launcher is fire-and-forget; we reap the zombie in a goroutine so
-	// it doesn't linger on the process table.
-	bg := context.Background()
-
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.CommandContext(bg, "open", url) //nolint:contextcheck // detach by design — see comment above
-	case "windows":
-		cmd = exec.CommandContext(bg, "rundll32", "url.dll,FileProtocolHandler", url) //nolint:contextcheck // detach by design
-	default:
-		cmd = exec.CommandContext(bg, "xdg-open", url) //nolint:contextcheck // detach by design
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { _ = cmd.Wait() }()
-	return nil
+	return browser.OpenURL(url)
 }
