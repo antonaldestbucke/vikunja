@@ -54,3 +54,7 @@ require (
 
 // personal fork - bumped go-mail to pick up the fix for missing MIME boundaries
 // see https://github.com/wneessen/go-mail/issues/XXX
+
+// NOTE: stretchr/testify is pinned at v1.8.4 intentionally; v1.9.0 changed
+// assert.EqualValues behaviour in a way that breaks several list-related tests
+// in this codebase. Revisit once those tests are updated.
