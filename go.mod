@@ -51,3 +51,6 @@ require (
 	xorm.io/builder v0.3.13
 	xorm.io/xorm v1.3.9
 )
+
+// personal fork - bumped go-mail to pick up the fix for missing MIME boundaries
+// see https://github.com/wneessen/go-mail/issues/XXX
